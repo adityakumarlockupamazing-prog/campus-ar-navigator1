@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title>Campus Navigator AR</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: white;
+            text-align: center;
+        }
+
+        #ui-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: center;
+            padding-top: 20px;
+            pointer-events: none; /* Allows clicks to pass through to the AR scene */
+            z-index: 100;
+            text-shadow: 1px 1px 2px black;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin: 0;
+        }
+
+        p {
+            margin: 5px 0 0 0;
+            font-size: 1rem;
+        }
+    </style>
+
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+
+    <script>
+        // Data for your campus locations
+        // *** REPLACE THESE COORDINATES WITH YOUR OWN CAMPUS LOCATIONS ***
+        const campusLocations = [
+            {
+                name: "Main Building",
+                latitude: 17.561564,
+                longitude: 78.455154
+            },
+            {
+                name: "Library",
+                latitude: 17.562090,
+                longitude: 78.455491
+            },
+            {
+                name: "Cafeteria",
+                latitude: 17.562308,
+                longitude: 78.455895
+            },
+            {
+                name: "CSIT(3rd year)",
+                latitude: 17.560994,
+                longitude: 78.455193
+            }
+        ];
+
+        // Haversine formula to calculate distance between two GPS coordinates
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3; // Earth's radius in meters
+            const φ1 = lat1 * Math.PI / 180;
+            const φ2 = lat2 * Math.PI / 180;
+            const Δφ = (lat2 - lat1) * Math.PI / 180;
+            const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                Math.cos(φ1) * Math.cos(φ2) *
+                Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+            return R * c; // Distance in meters
+        }
+
+        // A-Frame component to dynamically place AR entities based on GPS
+        AFRAME.registerComponent('ar-entity-loader', {
+            init: function () {
+                const sceneEl = this.el.sceneEl;
+
+                // Listen for a new GPS position update
+                sceneEl.addEventListener('gps-camera-update-position', (event) => {
+                    const userLat = event.detail.position.latitude;
+                    const userLon = event.detail.position.longitude;
+                    
+                    // Clear existing markers to prevent duplicates
+                    const existingEntities = document.querySelectorAll('[gps-new-entity-place]');
+                    existingEntities.forEach(el => el.remove());
+
+                    // Loop through all campus locations
+                    campusLocations.forEach(location => {
+                        const distance = calculateDistance(userLat, userLon, location.latitude, location.longitude);
+
+                        // Only show AR content for locations within 500 meters
+                        if (distance < 500) {
+                            // Create a new entity (container for AR objects)
+                            const entity = document.createElement('a-entity');
+                            
+                            // Add the AR.js component to place the entity at the real-world coordinates
+                            entity.setAttribute('gps-new-entity-place', {
+                                latitude: location.latitude,
+                                longitude: location.longitude
+                            });
+
+                            // Add a text label to the entity
+                            const text = document.createElement('a-text');
+                            text.setAttribute('value', `${location.name}\n${distance.toFixed(0)}m away`);
+                            text.setAttribute('scale', '20 20 20');
+                            text.setAttribute('look-at', '[gps-new-camera]');
+                            text.setAttribute('align', 'center');
+                            text.setAttribute('color', 'white');
+                            text.setAttribute('background-color', 'rgba(0,0,0,0.5)');
+                            
+                            // The height of the text (adjust as needed)
+                            text.setAttribute('position', '0 10 0');
+
+                            entity.appendChild(text);
+
+                            // Add the entity to the AR scene
+                            sceneEl.appendChild(entity);
+                        }
+                    });
+                });
+            }
+        });
+    </script>
+</head>
+<body>
+    <a-scene 
+        vr-mode-ui="enabled: false" 
+        arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;" 
+        ar-entity-loader>
+
+        <a-camera gps-new-camera look-controls></a-camera>
+    </a-scene>
+
+    <div id="ui-container">
+        <h1>AR Campus Navigator</h1>
+        <p>Walk around to see AR labels for nearby buildings.</p>
+        <p>Ensure your device's GPS and camera are enabled.</p>
+    </div>
+</body>
+
+</html>
+
+
